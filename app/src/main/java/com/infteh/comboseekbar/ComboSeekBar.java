@@ -2,10 +2,9 @@ package com.infteh.comboseekbar;
 
 import java.util.ArrayList;
 import java.util.List;
-
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.TypedArray;
-import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
@@ -17,13 +16,27 @@ import android.widget.ListView;
 import android.widget.SeekBar;
 
 public class ComboSeekBar extends SeekBar {
+
+	private static final int DEFAULT_SELECTED_LINE_HEIGHT = 10;
+	private static final int DEFAULT_UNSELECTED_LINE_HEIGHT = 5;
+	private static final int DEFAULT_TEXT_SIZE = 15;
+	private static final int DEFAULT_COLOR = Color.WHITE;
+	private static final int DEFAULT_DOT_RADIUS = 10;
+	private static final int DEFAULT_THUMB_WIDTH = 50;
+	private static final int DEFAULT_THUMB_HEIGHT = 50;
+
 	private CustomThumbDrawable mThumb;
 	private List<Dot> mDots = new ArrayList<Dot>();
 	private OnItemClickListener mItemClickListener;
 	private Dot prevSelected = null;
-	private boolean isSelected = false;
 	private int mColor;
 	private int mTextSize;
+	private int mDotRadius;
+	private int mSelectedLineHeight;
+	private int mUnselectedLineHeight;
+	private int mThumbWidth;
+	private int mThumbHeight;
+	private Drawable mThumbResource;
 	private boolean mIsMultiline;
 
 	/**
@@ -42,26 +55,94 @@ public class ComboSeekBar extends SeekBar {
 	 */
 	public ComboSeekBar(Context context, AttributeSet attrs) {
 		super(context, attrs);
-		TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.ComboSeekBar);
+		TypedArray a = context.obtainStyledAttributes(attrs,
+				R.styleable.ComboSeekBar);
 
-		mColor = a.getColor(R.styleable.ComboSeekBar_myColor, Color.WHITE);
-		mTextSize = a.getDimensionPixelSize(R.styleable.ComboSeekBar_textSize, 5);
+		mColor = a.getColor(R.styleable.ComboSeekBar_myColor, DEFAULT_COLOR);
+		mTextSize = a.getDimensionPixelSize(R.styleable.ComboSeekBar_textSize,
+				DEFAULT_TEXT_SIZE);
+		mDotRadius = a.getDimensionPixelSize(
+				R.styleable.ComboSeekBar_dotRadius, DEFAULT_DOT_RADIUS);
+		mSelectedLineHeight = a.getDimensionPixelSize(
+				R.styleable.ComboSeekBar_selectedLineHeight,
+				DEFAULT_SELECTED_LINE_HEIGHT);
+		mUnselectedLineHeight = a.getDimensionPixelSize(
+				R.styleable.ComboSeekBar_unselectedLineHeight,
+				DEFAULT_UNSELECTED_LINE_HEIGHT);
+		mThumbHeight = a.getDimensionPixelSize(
+				R.styleable.ComboSeekBar_thumbHeight, DEFAULT_THUMB_HEIGHT);
+		mThumbWidth = a.getDimensionPixelSize(
+				R.styleable.ComboSeekBar_thumbWidth, DEFAULT_THUMB_WIDTH);
 		mIsMultiline = a.getBoolean(R.styleable.ComboSeekBar_multiline, false);
+		mThumbResource = a.getDrawable(R.styleable.ComboSeekBar_thumb);
 		// do something with str
 
 		a.recycle();
-		mThumb = new CustomThumbDrawable(context, mColor);
+		if (mThumbResource == null)
+			mThumb = new CustomThumbDrawable(mColor);
+		else
+			mThumb = new CustomThumbDrawable(context, mColor, mThumbResource,
+					mThumbHeight, mThumbWidth);
 		setThumb(mThumb);
-		setProgressDrawable(new CustomDrawable(this.getProgressDrawable(), this, mThumb.getRadius(), mDots, mColor, mTextSize, mIsMultiline));
+		setProgressDrawable(new CustomDrawable(this.getProgressDrawable(),
+				this, mThumb.getRadius(), mDots, mColor, mTextSize,
+				mSelectedLineHeight, mUnselectedLineHeight, mDotRadius,
+				mIsMultiline));
 
-		// по умолчанию не равно 0 и это проблема
 		setPadding(0, 0, 0, 0);
+		// init the first position when show
+		postDelayed(new Runnable() {
+			@Override
+			public void run() {
+				lockPosition();
+			}
+		}, 0);
 	}
 
+	private void lockPosition() {
+		if ((mThumb != null) && (mDots.size() > 1)) {
+			Rect bounds = mThumb.copyBounds();
+			int intervalWidth = mDots.get(1).mX - mDots.get(0).mX;
+			if ((mDots.get(mDots.size() - 1).mX + mThumbWidth / 2 - bounds
+					.centerX()) < 0) {
+				bounds.right = mDots.get(mDots.size() - 1).mX;
+				bounds.left = mDots.get(mDots.size() - 1).mX;
+				mThumb.setBounds(bounds);
+
+				for (Dot dot : mDots) {
+					dot.isSelected = false;
+				}
+				mDots.get(mDots.size() - 1).isSelected = true;
+				handleClick(mDots.get(mDots.size() - 1));
+			}
+			for (int i = 0; i < mDots.size(); i++) {
+				if (Math.abs(mDots.get(i).mX + mThumbWidth / 2
+						- bounds.centerX()) <= (intervalWidth / 2)) {
+					bounds.right = mDots.get(i).mX + mThumbWidth / 2;
+					bounds.left = mDots.get(i).mX + mThumbHeight / 2;
+					mThumb.setBounds(bounds);
+					mDots.get(i).isSelected = true;
+					handleClick(mDots.get(i));
+				} else {
+					mDots.get(i).isSelected = false;
+				}
+			}
+		}
+	}
+
+	@SuppressLint("ClickableViewAccessibility")
 	@Override
 	public boolean onTouchEvent(MotionEvent event) {
-		isSelected = false;
-		return super.onTouchEvent(event);
+		boolean result = super.onTouchEvent(event);
+		switch (event.getAction()) {
+		case MotionEvent.ACTION_UP:
+			lockPosition();
+			break;
+
+		default:
+			break;
+		}
+		return result;
 	}
 
 	/**
@@ -71,12 +152,16 @@ public class ComboSeekBar extends SeekBar {
 	public void setColor(int color) {
 		mColor = color;
 		mThumb.setColor(color);
-		setProgressDrawable(new CustomDrawable((CustomDrawable) this.getProgressDrawable(), this, mThumb.getRadius(), mDots, color, mTextSize, mIsMultiline));
+		setProgressDrawable(new CustomDrawable(this.getProgressDrawable(),
+				this, mThumb.getRadius(), mDots, color, mTextSize,
+				mSelectedLineHeight, mUnselectedLineHeight, mDotRadius,
+				mIsMultiline));
 	}
 
 	public synchronized void setSelection(int position) {
 		if ((position < 0) || (position >= mDots.size())) {
-			throw new IllegalArgumentException("Position is out of bounds:" + position);
+			throw new IllegalArgumentException("Position is out of bounds:"
+					+ position);
 		}
 		for (Dot dot : mDots) {
 			if (dot.id == position) {
@@ -86,7 +171,6 @@ public class ComboSeekBar extends SeekBar {
 			}
 		}
 
-		isSelected = true;
 		invalidate();
 	}
 
@@ -110,62 +194,19 @@ public class ComboSeekBar extends SeekBar {
 		super.setThumb(thumb);
 	}
 
-	@Override
-	protected synchronized void onDraw(Canvas canvas) {
-		if ((mThumb != null) && (mDots.size() > 1)) {
-			if (isSelected) {
-				for (Dot dot : mDots) {
-					if (dot.isSelected) {
-						Rect bounds = mThumb.copyBounds();
-						bounds.right = dot.mX;
-						bounds.left = dot.mX;
-						mThumb.setBounds(bounds);
-						break;
-					}
-				}
-			} else {
-				int intervalWidth = mDots.get(1).mX - mDots.get(0).mX;
-				Rect bounds = mThumb.copyBounds();
-				// find nearest dot
-				if ((mDots.get(mDots.size() - 1).mX - bounds.centerX()) < 0) {
-					bounds.right = mDots.get(mDots.size() - 1).mX;
-					bounds.left = mDots.get(mDots.size() - 1).mX;
-					mThumb.setBounds(bounds);
-
-					for (Dot dot : mDots) {
-						dot.isSelected = false;
-					}
-					mDots.get(mDots.size() - 1).isSelected = true;
-					handleClick(mDots.get(mDots.size() - 1));
-				} else {
-					for (int i = 0; i < mDots.size(); i++) {
-						if (Math.abs(mDots.get(i).mX - bounds.centerX()) <= (intervalWidth / 2)) {
-							bounds.right = mDots.get(i).mX;
-							bounds.left = mDots.get(i).mX;
-							mThumb.setBounds(bounds);
-							mDots.get(i).isSelected = true;
-							handleClick(mDots.get(i));
-						} else {
-							mDots.get(i).isSelected = false;
-						}
-					}
-				}
-			}
-		}
-		super.onDraw(canvas);
-	}
-
 	private void handleClick(Dot selected) {
 		if ((prevSelected == null) || (prevSelected.equals(selected) == false)) {
 			if (mItemClickListener != null) {
-				mItemClickListener.onItemClick(null, this, selected.id, selected.id);
+				mItemClickListener.onItemClick(null, this, selected.id,
+						selected.id);
 			}
 			prevSelected = selected;
 		}
 	}
 
 	@Override
-	protected synchronized void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+	protected synchronized void onMeasure(int widthMeasureSpec,
+			int heightMeasureSpec) {
 		CustomDrawable d = (CustomDrawable) getProgressDrawable();
 
 		int thumbHeight = mThumb == null ? 0 : mThumb.getIntrinsicHeight();
@@ -179,16 +220,18 @@ public class ComboSeekBar extends SeekBar {
 		dw += getPaddingLeft() + getPaddingRight();
 		dh += getPaddingTop() + getPaddingBottom();
 
-		setMeasuredDimension(resolveSize(dw, widthMeasureSpec), resolveSize(dh, heightMeasureSpec));
+		setMeasuredDimension(resolveSize(dw, widthMeasureSpec),
+				resolveSize(dh, heightMeasureSpec));
 	}
 
 	/**
 	 * dot coordinates.
 	 */
 	private void initDotsCoordinates() {
-		float intervalWidth = (getWidth() - (mThumb.getRadius() * 2)) / (mDots.size() - 1);
+		float intervalWidth = (getWidth() - (mThumb.getRadius() * 2))
+				/ (mDots.size() - 1);
 		for (Dot dot : mDots) {
-			dot.mX = (int) (mThumb.getRadius() + intervalWidth * (dot.id));
+			dot.mX = (int) (mThumbWidth / 2 + intervalWidth * (dot.id));
 		}
 	}
 
@@ -206,7 +249,8 @@ public class ComboSeekBar extends SeekBar {
 	 * 
 	 * @see ListView#setOnItemClickListener(android.widget.AdapterView.OnItemClickListener)
 	 */
-	public void setOnItemClickListener(AdapterView.OnItemClickListener clickListener) {
+	public void setOnItemClickListener(
+			AdapterView.OnItemClickListener clickListener) {
 		mItemClickListener = clickListener;
 	}
 
