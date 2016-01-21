@@ -1,12 +1,14 @@
 package com.infteh.comboseekbar;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
-import android.util.TypedValue;
+import android.graphics.drawable.NinePatchDrawable;
 
 /**
  * seekbar background with text on it.
@@ -19,12 +21,20 @@ public class CustomThumbDrawable extends Drawable {
 	 * paints.
 	 */
 	private Paint circlePaint;
-	private Context mContext;
 	private float mRadius;
+	private Drawable mThumbDrawable;
+	private int mThumbHeight;
+	private int mThumbWidth;
 
-	public CustomThumbDrawable(Context context, int color) {
-		mContext = context;
-		mRadius = toPix(15);
+	public CustomThumbDrawable(Context context, int color,
+			Drawable thumbDrawable, int thumbHeight, int thumbWidth) {
+		this.mThumbDrawable = thumbDrawable;
+		this.mThumbHeight = thumbHeight;
+		this.mThumbWidth = thumbWidth;
+	}
+
+	public CustomThumbDrawable(int color) {
+		mRadius = 15;
 		setColor(color);
 	}
 
@@ -33,9 +43,11 @@ public class CustomThumbDrawable extends Drawable {
 		circlePaint.setColor((0xA0 << 24) + (color & 0x00FFFFFF));
 		invalidateSelf();
 	}
-	
+
 	public float getRadius() {
-		return mRadius;
+		if (mThumbDrawable == null)
+			return mRadius;
+		return mThumbHeight * 1.0f / 2;
 	}
 
 	@Override
@@ -49,21 +61,52 @@ public class CustomThumbDrawable extends Drawable {
 		return true;
 	}
 
+	private Bitmap drawable2Bitmap(Drawable drawable) {
+		if (drawable instanceof BitmapDrawable) {
+			return ((BitmapDrawable) drawable).getBitmap();
+		} else if (drawable instanceof NinePatchDrawable) {
+			Bitmap bitmap = Bitmap
+					.createBitmap(
+							drawable.getIntrinsicWidth(),
+							drawable.getIntrinsicHeight(),
+							drawable.getOpacity() != PixelFormat.OPAQUE ? Bitmap.Config.ARGB_8888
+									: Bitmap.Config.RGB_565);
+			Canvas canvas = new Canvas(bitmap);
+			drawable.setBounds(0, 0, drawable.getIntrinsicWidth(),
+					drawable.getIntrinsicHeight());
+			drawable.draw(canvas);
+			return bitmap;
+		} else {
+			return null;
+		}
+	}
+
 	@Override
 	public final void draw(Canvas canvas) {
 		int height = this.getBounds().centerY();
 		int width = this.getBounds().centerX();
-		canvas.drawCircle(width + mRadius, height, mRadius, circlePaint);
+		if (mThumbDrawable == null) {
+			canvas.drawCircle(width + mRadius, height, mRadius, circlePaint);
+		} else {
+			Bitmap bm = drawable2Bitmap(mThumbDrawable);
+			Bitmap bitmap = Bitmap.createScaledBitmap(bm, mThumbWidth,
+					mThumbHeight, true);
+			canvas.drawBitmap(bitmap, width - getRadius(), height - getRadius(), circlePaint);
+		}
 	}
 
 	@Override
 	public int getIntrinsicHeight() {
-		return (int) (mRadius * 2);
+		if (mThumbDrawable == null)
+			return (int) (mRadius * 2);
+		return mThumbHeight;
 	}
 
 	@Override
 	public int getIntrinsicWidth() {
-		return (int) (mRadius * 2);
+		if (mThumbDrawable == null)
+			return (int) (mRadius * 2);
+		return mThumbWidth;
 	}
 
 	@Override
@@ -77,10 +120,5 @@ public class CustomThumbDrawable extends Drawable {
 
 	@Override
 	public void setColorFilter(ColorFilter cf) {
-	}
-
-	private float toPix(int size) {
-		return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, size,
-				mContext.getResources().getDisplayMetrics());
 	}
 }

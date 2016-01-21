@@ -2,8 +2,6 @@ package com.infteh.comboseekbar;
 
 import java.util.List;
 
-import com.infteh.comboseekbar.ComboSeekBar.Dot;
-
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
 import android.graphics.Paint;
@@ -11,7 +9,8 @@ import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
-import android.util.TypedValue;
+
+import com.infteh.comboseekbar.ComboSeekBar.Dot;
 
 /**
  * seekbar background with text on it.
@@ -20,7 +19,7 @@ import android.util.TypedValue;
  * 
  */
 public class CustomDrawable extends Drawable {
-	private final ComboSeekBar mySlider;
+
 	private final Drawable myBase;
 	private final Paint textUnselected;
 	private float mThumbRadius;
@@ -31,19 +30,26 @@ public class CustomDrawable extends Drawable {
 	private List<Dot> mDots;
 	private Paint selectLinePaint;
 	private Paint circleLinePaint;
-	private float mDotRadius;
+	private int mDotRadius;
 	private Paint textSelected;
 	private int mTextSize;
 	private float mTextMargin;
 	private int mTextHeight;
 	private boolean mIsMultiline;
+	private int mSelectedLineHeight;
+	private int mUnselectedLineHeight;
 
-	public CustomDrawable(Drawable base, ComboSeekBar slider, float thumbRadius, List<Dot> dots, int color, int textSize, boolean isMultiline) {
+	public CustomDrawable(Drawable base, ComboSeekBar slider,
+			float thumbRadius, List<Dot> dots, int color, int textSize,
+			int selectedLineHeight, int unselectedLineHeight, int dotRadius,
+			boolean isMultiline) {
 		mIsMultiline = isMultiline;
-		mySlider = slider;
 		myBase = base;
 		mDots = dots;
 		mTextSize = textSize;
+		mSelectedLineHeight = selectedLineHeight;
+		mUnselectedLineHeight = unselectedLineHeight;
+		mDotRadius = dotRadius;
 		textUnselected = new Paint(Paint.ANTI_ALIAS_FLAG);
 		textUnselected.setColor(color);
 		textUnselected.setAlpha(255);
@@ -58,11 +64,11 @@ public class CustomDrawable extends Drawable {
 		unselectLinePaint = new Paint();
 		unselectLinePaint.setColor(color);
 
-		unselectLinePaint.setStrokeWidth(toPix(1));
+		unselectLinePaint.setStrokeWidth(mUnselectedLineHeight);
 
 		selectLinePaint = new Paint();
 		selectLinePaint.setColor(color);
-		selectLinePaint.setStrokeWidth(toPix(3));
+		selectLinePaint.setStrokeWidth(mSelectedLineHeight);
 
 		circleLinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 		circleLinePaint.setColor(color);
@@ -75,12 +81,8 @@ public class CustomDrawable extends Drawable {
 		textSelected.setTextSize(mTextSize);
 
 		mTextHeight = textBounds.height();
-		mDotRadius = toPix(5);
-		mTextMargin = toPix(3);
-	}
-
-	private float toPix(int size) {
-		return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, size, mySlider.getContext().getResources().getDisplayMetrics());
+		// mDotRadius = toPix(DOT_RADIUS);
+		mTextMargin = 3;
 	}
 
 	@Override
@@ -101,17 +103,19 @@ public class CustomDrawable extends Drawable {
 
 	@Override
 	public final void draw(Canvas canvas) {
-		// Log.d("--- draw:" + (getBounds().right - getBounds().left));
 		int height = this.getIntrinsicHeight() / 2;
 		if (mDots.size() == 0) {
-			canvas.drawLine(0, height, getBounds().right, height, unselectLinePaint);
+			canvas.drawLine(0, height, getBounds().right, height,
+					unselectLinePaint);
 			return;
 		}
 		for (Dot dot : mDots) {
 			drawText(canvas, dot, dot.mX, height);
 			if (dot.isSelected) {
-				canvas.drawLine(mDots.get(0).mX, height, dot.mX, height, selectLinePaint);
-				canvas.drawLine(dot.mX, height, mDots.get(mDots.size() - 1).mX, height, unselectLinePaint);
+				canvas.drawLine(mDots.get(0).mX, height, dot.mX, height,
+						selectLinePaint);
+				canvas.drawLine(dot.mX, height, mDots.get(mDots.size() - 1).mX,
+						height, unselectLinePaint);
 			}
 			canvas.drawCircle(dot.mX, height, mDotRadius, circleLinePaint);
 		}
@@ -162,9 +166,15 @@ public class CustomDrawable extends Drawable {
 	@Override
 	public final int getIntrinsicHeight() {
 		if (mIsMultiline) {
-			return (int) (selectLinePaint.getStrokeWidth() + mDotRadius + (mTextHeight) * 2  + mTextMargin);
+			return (int) (selectLinePaint.getStrokeWidth() + mDotRadius
+					+ (mTextHeight) * 2 + mTextMargin);
 		} else {
-			return (int) (mThumbRadius + mTextMargin + mTextHeight + mDotRadius);
+			int thumbHeight = (int) mThumbRadius * 2;
+			int dotHeight = (int) mDotRadius * 2;
+			return Math.max(thumbHeight, dotHeight);
+			// return (int) (mThumbRadius * 2);
+			// return (int) (mThumbRadius + mTextMargin + mTextHeight +
+			// mDotRadius);
 		}
 	}
 
