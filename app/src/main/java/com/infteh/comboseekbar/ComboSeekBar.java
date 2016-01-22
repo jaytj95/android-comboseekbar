@@ -234,6 +234,15 @@ public class ComboSeekBar extends SeekBar {
 			dot.mX = (int) (mThumbWidth / 2 + intervalWidth * (dot.id));
 		}
 	}
+	
+	private int getSelectedDot() {
+		for(Dot dot: mDots) {
+			if(dot.isSelected) {
+				return mDots.indexOf(dot);
+			}
+		}
+		return -1;
+	}
 
 	@Override
 	protected void onSizeChanged(int w, int h, int oldw, int oldh) {
