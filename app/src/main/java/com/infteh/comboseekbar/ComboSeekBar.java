@@ -223,6 +223,14 @@ public class ComboSeekBar extends SeekBar {
 		setMeasuredDimension(resolveSize(dw, widthMeasureSpec),
 				resolveSize(dh, heightMeasureSpec));
 	}
+	
+	private int getSelectedDot() {
+		for(Dot dot: mDots) {
+			if(dot.isSelected)
+				return mDots.indexOf(dot);
+		}
+		return -1;
+	}
 
 	/**
 	 * dot coordinates.
